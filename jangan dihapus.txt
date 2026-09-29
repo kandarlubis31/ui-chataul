@@ -1,0 +1,90 @@
+Sip bro, sekarang kita bahas beneran. Kabar baiknya: persis use case lo itu udah solved problem di dunia self-hosting, dan namanya kombinasi wildcard DNS + tunnel + self-hosted PaaS. Gw jabarin konsepnya, lalu rekomendasi konkret.
+
+────────────────────────────────────────────────────────────────────────────────
+
+🎯 Inti masalah lo
+
+Sekarang alur lo: "project baru → deploy Vercel → add domain → set DNS → add domain lagi di setting → repeat" 😮‍💨
+
+Alur yang lo mau: "project baru → run di homeserver → langsung ada di  namaproject.paklubis.my.id "
+
+Kuncinya ada 3 lapis:
+
+1. Wildcard DNS (sekali setup, habis itu lupakan DNS selamanya)
+
+Di Cloudflare (pindahin DNS lo ke sini kalo belum, gratis):
+
+*.paklubis.my.id  →  CNAME  <tunnel-id>.cfargotunnel.com
+
+Setelah ini, subdomain apapun otomatis resolve —  app1. ,  app2. ,  gabut-999.  — tanpa nyentuh dashboard DNS lagi. Ini yang ngebunuh 80% keribetan lo.
+
+2. Cloudflare Tunnel — jawaban buat homeserver
+
+Ini komponen paling penting buat kondisi lo, karena:
+- ISP Indonesia hampir selalu CGNAT (cek: IP di dashboard router ≠ IP di whatismyip = kena CGNAT, port forwarding mustahil). Tunnel nge-bypass ini total —  cloudflared  bikin koneksi outbound ke Cloudflare, nggak butuh buka port apapun.
+- IP asli rumah lo nggak ke-expose — nggak kena scan bot, nggak perlu mikirin firewall/DDS.
+- HTTPS + sertifikat otomatis, gratis.
+- Bonus: Cloudflare Zero Trust (Access) bisa dikasih di depan — project demo tertentu bisa lo kunci pake login email, buat yang nggak mau dipublik.
+
+Tradeoff yang jujur: traffic lo lewat infra Cloudflare (ada sedikit latency, dan streaming video berat semi-langgar semangat TOS mereka — buat demo web app biasa aman terus).
+
+3. Self-hosted PaaS — biar "run project" = "ada URL"
+
+Ini yang nggantin "deploy + add domain" di Vercel. Pilihan yang relevan di 2026:
+
+┌──────────────────────┬─────────────────────────────────────────────────────┬────────────────────────────────────────┐
+│ Tool                 │ Vibe                                                │ Cocok buat lo kalau...                 │
+├──────────────────────┼─────────────────────────────────────────────────────┼────────────────────────────────────────┤
+│ Coolify              │ Paling populer, UI paling lengkap, push-to-deploy   │ Mau pengalaman "Vercel sendiri" —      │
+│                      │ dari GitHub, 1-click DB                             │ rekomendasi utama gw                   │
+│ Dokploy              │ Lebih ringan & muda, native Docker Compose          │ RAM server lo tipis (<2GB)             │
+│ CapRover             │ Veteran, solid, agak kaku                           │ Mau yang udah terbukti & boring        │
+│ Dokku                │ CLI-only, git push = deploy, zero UI                │ Lo tipe "terminalEnjoyer"              │
+│ Traefik/NPM + Docker │ DIY total                                           │ Mau kontrol penuh & senang wiring      │
+│ manual               │                                                     │ sendiri                                │
+└──────────────────────┴─────────────────────────────────────────────────────┴────────────────────────────────────────┘
+
+Yang bikin combo ini cantik: Coolify (dan Dokploy/CapRover) paham wildcard domain. Lo set sekali: "instance domain:  *.paklubis.my.id " + kasih Cloudflare API token (buat DNS-01 challenge) → setiap app baru otomatis dapat subdomain + HTTPS valid dalam hitungan detik. Beneran nggak ada langkah domain lagi.
+
+────────────────────────────────────────────────────────────────────────────────
+
+🏗️ Arsitektur final yang gw sarankan
+
+Orang buka app1.paklubis.my.id
+        │
+   Cloudflare (DNS + proxy + opsional WAF/Access)
+        │
+   Cloudflare Tunnel  ←—— cloudflared daemon di homeserver (outbound)
+        │
+   Coolify (di Docker, sekalian manage Traefik proxy-nya)
+        │
+   ┌────┼─────────┐
+  app1  app2  app3...   ← container project-project lo
+
+Dan domain  paklubis.my.id -nya bisa di-split:
+- Apex / www → tetap di Vercel (main site / portofolio, tetap gratis tier Vercel)
+-  *.paklubis.my.id  → homeserver, buat semua project gabut & demo
+
+Jadi lo dapet yang terbaik dari dua dunia: app serius stay di Vercel (uptime bagus, edge network), project demo/gabut hidup di rumah. Malah keren pas ngobrol: "oh ini gw host di server sendiri di rumah" 😎
+
+────────────────────────────────────────────────────────────────────────────────
+
+⚠️ Gotchas yang perlu lo tau (biar nggak kaget)
+
+1. Dashboard Coolify JANGAN di-expose publik — bind ke localhost aja, akses via Tailscale/SSH tunnel. Kalau mau web UI dari luar, depanin Cloudflare Access.
+2. Homeserver = uptime lo yang jaga — listrik mati/reboot router = semua demo down. Buat demo buat temen, fine. Buat yang penting, Vercel.
+3. RAM: Coolify nyaman di 2GB+, tiap Next.js container makan ~200-500MB. Kalau server lo 4GB, muat ~5-6 project santai.
+4. Vercel + Cloudflare apex: pas pindah DNS ke Cloudflare, record apex ke Vercel ( 76.76.21.21 ) pakai DNS-only (grey cloud) biar validasi cert Vercel nggak ribet.
+5. Backup folder data Coolify + volume DB secara berkala — sekali setup, lupakan.
+6. Kalau suatu saat butuh akses privat (bukan publik): Tailscale gratis, install 2 menit, semua server lo bisa diakses dari mana aja seolah satu LAN.
+
+────────────────────────────────────────────────────────────────────────────────
+
+TL;DR alur baru lo
+
+> Project gabut baru selesai → push ke GitHub → di Coolify klik "New Resource → dari GitHub" → pilih repo → set subdomain  gabut.paklubis.my.id  → Deploy.
+
+
+≈ 90 detik, nol sentuhan DNS, nol Vercel, HTTPS otomatis. Itu yang lo cari kan? 😄
+
+Gw udah verifikasi juga via search: kombinasi Cloudflare Tunnel + wildcard + Coolify/Dokploy ini memang pola standar yang direkomendasi komunitas self-hosted sepanjang 2025–2026, dokumentasi resminya aktif semua.
