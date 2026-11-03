@@ -20,6 +20,3 @@ A modern AI chat interface inspired by Claude.ai's clean, conversation-focused d
 - Testing: `pnpm test` (vitest, `tests/`) untuk pure functions — SSE parser, markdown, token estimator, context compression, rate limiter.
 - Sebelum commit: `pnpm typecheck && pnpm test && pnpm build`.
 
----
-
-*Generated: 2026-08-08 · Updated: 2026-09-15 · Path: nodeJS\Ui-chataul*
