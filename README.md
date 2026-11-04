@@ -35,7 +35,3 @@ pnpm lint       # next lint
 ```
 
 Salin `.env.local.example` → `.env.local` untuk konfigurasi (provider key, `NEXT_PUBLIC_LOCKED` untuk shared mode).
-
----
-
-Lihat `CONTEXT.md` di folder ini untuk detail arsitektur.
