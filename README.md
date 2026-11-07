@@ -35,3 +35,11 @@ pnpm lint       # next lint
 ```
 
 Salin `.env.local.example` → `.env.local` untuk konfigurasi (provider key, `NEXT_PUBLIC_LOCKED` untuk shared mode).
+
+---
+
+## English
+
+**ui-chataul** is an AI chat interface modelled on Claude.ai's conversation-focused layout, built with Next.js 14, TypeScript, and Tailwind CSS.
+
+It supports multiple providers (OpenAI, Anthropic, Ollama, and any OpenAI-compatible endpoint), streaming with markdown rendering, image and PDF upload, DuckDuckGo web search, cross-session chat search, Markdown export, and offline persistence through IndexedDB and a PWA manifest.
